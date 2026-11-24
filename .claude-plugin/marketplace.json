@@ -1,0 +1,15 @@
+{
+  "name": "token-saver",
+  "owner": {
+    "name": "quzp1993",
+    "url": "https://github.com/quzp1993"
+  },
+  "plugins": [
+    {
+      "name": "token-saver",
+      "description": "Answer in the fewest tokens that keep every technical fact, with hooks that compact command output and inject the ruleset every session.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}
