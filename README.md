@@ -21,9 +21,9 @@ npx skills add quzp1993/TokenSaver
 - **Input** — command-output hygiene: batch commands, compact flags, pipe noisy output down, grep instead of cat, read only log tails. A `PreToolUse` hook compacts `git status` → `git status --short` and `git log` → `git log --oneline -n 30` automatically.
 - **Context** — lean persistent files: one-line pointers in CLAUDE.md, offload reference to files read on demand. A `SessionStart` hook injects the full ruleset every session so the rules stay active without manual invocation.
 
-## Benchmark (output lever)
+## Benchmark (three levers)
 
-10 questions, 3 output strategies, token count via cl100k_base:
+**Output** — 10 questions, 3 strategies, cl100k_base:
 
 | Strategy | tokens | vs baseline | key-info retention |
 |---|---|---|---|
@@ -32,7 +32,19 @@ npx skills add quzp1993/TokenSaver
 | **TokenSaver** | **479** | **−70.9%** | **100%** |
 | hybrid (best per question) | 459 | −72.1% | 100% |
 
-Reproducible data and script: [`benchmark/`](benchmark/).
+**Input** — real command output, raw vs token-saver hook vs rtk:
+
+| command | raw | token-saver | rtk |
+|---|---|---|---|
+| git status | 23 | 0 | 12 |
+| git log | 438 | 49 | 203 |
+| ls -la ~/.claude | 776 | — | 185 |
+| find ~/.claude/plugins -type f | 143019 | — | 14 |
+| **total** | **144256** | **143844** | **414** (−99.7%) |
+
+**Context** — global CLAUDE.md + RTK.md load at **103 tokens** (pointer pattern); token-saver ruleset injection costs 193 tokens/session to keep all three levers automatic.
+
+Reproducible data and scripts: [`benchmark/`](benchmark/).
 
 ## Structure
 
