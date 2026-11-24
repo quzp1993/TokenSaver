@@ -1,59 +1,59 @@
 # TokenSaver
 
-Claude Code plugin that saves tokens on three levers: **output** (reply), **input** (command output), **context** (persistent files).
+Token-saving pipeline for Claude Code. One install wires three compression levers. Like prokka wiring prodigal/hmmer/aragorn into one annotation pipeline, TokenSaver orchestrates rtk plus its own rules instead of reimplementing them.
+
+## What it is
+
+TokenSaver is an orchestrator, not another compressor. Each lever is handled by the best tool:
+
+| Lever | Engine | What it does |
+|---|---|---|
+| Input | **rtk** (integrated) | compress / aggregate / truncate command output before it reaches the model |
+| Output | TokenSaver skill | minimum-token answers, every technical fact kept |
+| Context | TokenSaver hooks | lean CLAUDE.md pointers + on-demand files, rules auto-injected |
+
+## Features
+
+- `SessionStart` / `SubagentStart` hook injects the ruleset every session — savings are automatic, no manual invocation.
+- `PreToolUse` hook compacts `git status` → `--short`, `git log` → `--oneline -n 30` (lossless whitelist).
+- `setup.sh` — one command wires rtk (installs + global hook) and installs the plugin.
+- Skill rules cover output (zero-prose code), input (rtk / compact flags / pipe), context (one-line pointers).
+
+## Strategy
+
+1. **Do not reimplement specialized tools.** Input compression is rtk's job; TokenSaver calls rtk, adds its own lossless git rewrites, and owns the output + context levers.
+2. **Output wins by dropping prose, never facts.** Code/SQL/shell with zero prose, facts as comma lists or `key: value`, no decorative glyphs, negations always kept.
+3. **Context trades a fixed 193-token ruleset injection for always-on enforcement** across all three levers.
 
 ## Install
 
 ```bash
-claude plugin marketplace add quzp1993/TokenSaver
-claude plugin install token-saver@token-saver
+bash setup.sh
 ```
 
-Skill only, no hooks:
+Manual: `claude plugin marketplace add quzp1993/TokenSaver && claude plugin install token-saver@token-saver` (rtk via winget / brew).
 
-```bash
-npx skills add quzp1993/TokenSaver
-```
+## Combined benchmark
 
-## Three levers
+Reference session = 10 Q&A + 4 command types + 1 session start:
 
-- **Output** — minimum-token answers: code/SQL/shell with zero prose, facts as comma lists or `key: value`, no decorative glyphs, negations never dropped.
-- **Input** — command-output hygiene: batch commands, compact flags, pipe noisy output down, grep instead of cat, read only log tails. A `PreToolUse` hook compacts `git status` → `git status --short` and `git log` → `git log --oneline -n 30` automatically.
-- **Context** — lean persistent files: one-line pointers in CLAUDE.md, offload reference to files read on demand. A `SessionStart` hook injects the full ruleset every session so the rules stay active without manual invocation.
-
-## Benchmark (three levers)
-
-**Output** — 10 questions, 3 strategies, cl100k_base:
-
-| Strategy | tokens | vs baseline | key-info retention |
+| Lever | baseline | TokenSaver | saved |
 |---|---|---|---|
-| baseline | 1644 | — | 100% |
-| caveman | 577 | −64.9% | 100% |
-| **TokenSaver** | **479** | **−70.9%** | **100%** |
-| hybrid (best per question) | 459 | −72.1% | 100% |
+| output | 1644 | 479 | −70.9% |
+| input | 144256 | 414 | −99.7% |
+| context | 707 | 296 | −58.1% |
+| **total** | **146607** | **1189** | **−99.2%** |
 
-**Input** — real command output, raw vs token-saver hook vs rtk:
-
-| command | raw | token-saver | rtk |
-|---|---|---|---|
-| git status | 23 | 0 | 12 |
-| git log | 438 | 49 | 203 |
-| ls -la ~/.claude | 776 | — | 185 |
-| find ~/.claude/plugins -type f | 143019 | — | 14 |
-| **total** | **144256** | **143844** | **414** (−99.7%) |
-
-**Context** — global CLAUDE.md + RTK.md load at **103 tokens** (pointer pattern); token-saver ruleset injection costs 193 tokens/session to keep all three levers automatic.
-
-Reproducible data and scripts: [`benchmark/`](benchmark/).
+Context savings scale with how bloated the original CLAUDE.md is (real projects 1000–8000 tokens save proportionally more). Full tables and scripts in [`benchmark/`](benchmark/).
 
 ## Structure
 
 ```
-.claude-plugin/plugin.json      manifest + hooks
-.claude-plugin/marketplace.json marketplace entry
-skills/token-saver/SKILL.md     the skill
-src/hooks/session-start.js      injects ruleset every session
-src/hooks/pre-tool-use.js       compacts git status / git log
+.claude-plugin/   manifest + marketplace
+skills/           the skill
+src/hooks/        session-start.js, pre-tool-use.js
+setup.sh          one-command installer (wires rtk)
+benchmark/        questions, answers, count.py, input_bench.py, combined_bench.py, results.md
 ```
 
 ## License
